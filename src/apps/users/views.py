@@ -5,6 +5,8 @@ from .models import User
 from .models import Doctor, Patient
 from .serializers import RegisterSerializer, UserSerializer, DoctorSerializer, PatientSerializer
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
 
 # User Registration View
 class RegisterView(generics.CreateAPIView):
@@ -22,7 +24,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user  # Return the authenticated user's profile
 
 # Logout View (Token Blacklist)
-class LogoutView(generics.GenericAPIView):
+class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
