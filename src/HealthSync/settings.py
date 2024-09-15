@@ -37,10 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
-    'apps.users',
-    'apps.appointments',
+    'rest_framework', # REST framework
+    'rest_framework_simplejwt.token_blacklist', # JWT token blacklist
+    'drf_yasg', # Swagger UI
+    'apps.users', # Custom users app
+    'apps.appointments', # Appointments app
+    'corsheaders' # CORS headers
 ]
 
 MIDDLEWARE = [
@@ -51,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware' # CORS middleware
 ]
 
 ROOT_URLCONF = 'HealthSync.urls'
@@ -146,3 +149,4 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'users.User'
+CORS_ALLOW_ALL_ORIGINS = True
