@@ -1,0 +1,30 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.env
+
+# Django
+*.log
+db.sqlite3
+media/
+static/
+
+# Virtual environments
+env/
+venv/
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# Node dependencies (if applicable)
+node_modules/
+
+# Django secret key file (if you use one)
+secret_key.txt
+
+# OS files
+.DS_Store
+Thumbs.db
