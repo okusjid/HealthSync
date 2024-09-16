@@ -1,36 +1,44 @@
-from rest_framework import generics, permissions
+# views.py
+from rest_framework import generics
 from .models import Appointment
 from .serializers import AppointmentSerializer
+from .permissions import IsAdminUserOrReadOnlyForDoctors, IsAdminUserOrAppointmentDoctor
 
-# List Appointments for an authenticated user
-class AppointmentListView(generics.ListAPIView):
+# List and create appointments (only admin can create)
+class AppointmentListView(generics.ListCreateAPIView):
     serializer_class = AppointmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminUserOrReadOnlyForDoctors]
 
     def get_queryset(self):
-        # Filter appointments for the logged-in doctor
-        return Appointment.objects.filter(doctor__user=self.request.user)
+        user = self.request.user
+        if user.is_staff:
+            # Admin users can see all appointments
+            return Appointment.objects.all()
+        elif hasattr(user, 'doctor'):
+            # Doctors can see their own appointments
+            return Appointment.objects.filter(doctor=user.doctor)
+        else:
+            # Other users have no access
+            return Appointment.objects.none()
 
-# Create a new Appointment
-class AppointmentCreateView(generics.CreateAPIView):
-    serializer_class = AppointmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    def perform_create(self, serializer):
+        # Only admin users can create appointments
+        serializer.save()
 
-# Detail View for an Appointment
-class AppointmentDeleteView(generics.RetrieveUpdateDestroyAPIView):
+# Retrieve, update, and delete appointments (only admin can update/delete)
+class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AppointmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminUserOrAppointmentDoctor]
+    lookup_field = 'id'
 
     def get_queryset(self):
-        # Filter appointments for the logged-in doctor
-        return Appointment.objects.filter(doctor__user=self.request.user)
-    
-# Update an existing Appointment
-class AppointmentUpdateView(generics.UpdateAPIView):
-    serializer_class = AppointmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        # Filter appointments for the logged-in doctor
-        return Appointment.objects.filter(doctor__user=self.request.user)
-    
+        user = self.request.user
+        if user.is_staff:
+            # Admin users can access all appointments
+            return Appointment.objects.all()
+        elif hasattr(user, 'doctor'):
+            # Doctors can access their own appointments
+            return Appointment.objects.filter(doctor=user.doctor)
+        else:
+            # Other users have no access
+            return Appointment.objects.none()

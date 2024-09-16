@@ -1,6 +1,6 @@
 from django.db import models
 from apps.users.models import Doctor, Patient
-from ..base_model import TimeStampedModel  # Import the base model
+from ..base_model import TimeStampedModel
 
 class Appointment(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
@@ -9,8 +9,13 @@ class Appointment(TimeStampedModel):
     is_completed = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Appointment with Dr. {self.doctor.user.last_name} for {self.patient.user.get_full_name()} on {self.scheduled_at}"
+        doctor_name = self.doctor.user.last_name or "Unknown Doctor"
+        patient_name = self.patient.user.get_full_name() or "Unknown Patient"
+        return f"Appointment with Dr. {doctor_name} for {patient_name} on {self.scheduled_at}"
 
     def details(self):
         status = "Completed" if self.is_completed else "Pending"
-        return f"Appointment with Dr. {self.doctor.user.last_name} for {self.patient.user.get_full_name()} on {self.scheduled_at.strftime('%b %d, %Y %H:%M')}. Status: {status}."
+        doctor_name = self.doctor.user.last_name or "Unknown Doctor"
+        patient_name = self.patient.user.get_full_name() or "Unknown Patient"
+        scheduled_time = self.scheduled_at.strftime('%b %d, %Y %H:%M')
+        return f"Appointment with Dr. {doctor_name} for {patient_name} on {scheduled_time}. Status: {status}."

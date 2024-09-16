@@ -11,7 +11,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
 
 # User Profile View (for authenticated users)
-class ProfileView(generics.RetrieveUpdateAPIView):
+class ProfileView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
