@@ -12,7 +12,7 @@ schema_view = get_schema_view(
         title="HealthSync API",
         default_version='v1',
         description="API documentation for HealthSync",
-        contact=openapi.Contact(email="support@healthsync.com"),
+        contact=openapi.Contact(email="usjidn@gmail.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,

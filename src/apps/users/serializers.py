@@ -36,20 +36,3 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'phone_number', 'is_doctor', 'is_patient']
 
-
-# Serializer for Doctor
-class DoctorSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = Doctor
-        fields = ['user', 'specialization', 'created_at', 'updated_at']
-
-
-# Serializer for Patient
-class PatientSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = Patient
-        fields = ['user', 'date_of_birth', 'gender', 'created_at', 'updated_at']
