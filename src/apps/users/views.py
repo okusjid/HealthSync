@@ -6,6 +6,7 @@ from .models import Doctor, Patient
 from .serializers import RegisterSerializer, UserSerializer, DoctorSerializer, PatientSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from django.http import Http404
 
 
 # User Registration View
@@ -23,18 +24,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user  # Return the authenticated user's profile
 
-# Logout View (Token Blacklist)
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        try:
-            refresh_token = request.data["refresh"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response({"detail": "Logout successful."})
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
 
 # Doctor View (retrieve and update doctor details)
 class DoctorView(generics.RetrieveUpdateAPIView):
@@ -42,9 +32,14 @@ class DoctorView(generics.RetrieveUpdateAPIView):
     serializer_class = DoctorSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_object(self):
-        return self.request.user.doctor  # Retrieve the doctor's profile based on the logged-in user
+    # def get_object(self):
+    #     # Assuming Doctor model has a OneToOneField with the User model
+    #     try:
+    #         return self.request
+    #     except Doctor.DoesNotExist:
+    #         raise Http404("Doctor not found")
 
+        
 # Patient View (retrieve and update patient details)
 class PatientView(generics.RetrieveUpdateAPIView):
     queryset = Patient.objects.all()
@@ -53,3 +48,16 @@ class PatientView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user.patient  # Retrieve the patient's profile based on the logged-in user
+
+# # Logout View (Token Blacklist)
+# class LogoutView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         try:
+#             refresh_token = request.data["refresh"]
+#             token = RefreshToken(refresh_token)
+#             token.blacklist()
+#             return Response({"detail": "Logout successful."})
+#         except Exception as e:
+#             return Response({"error": str(e)}, status=400)
