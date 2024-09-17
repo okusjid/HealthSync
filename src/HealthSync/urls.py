@@ -6,6 +6,13 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
 
+"""
+URL configuration for the HealthSync project.
+This module defines the URL patterns for the HealthSync project, including
+admin routes, authentication routes, user profile routes, appointment routes,
+and API documentation routes.
+"""
+
 # Swagger Schema View
 schema_view = get_schema_view(
     openapi.Info(
@@ -19,6 +26,7 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+# Define URL patterns
 urlpatterns = [
     path('admin/', admin.site.urls),  # Admin Panel
     path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Obtain JWT Token
@@ -30,7 +38,7 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),  # ReDoc UI (optional)
 ]
 
-# Customize Admin Titles
+# Admin Customization
 admin.site.site_header = "HealthSync Admin"
 admin.site.site_title = "HealthSync Admin Portal"
 admin.site.index_title = "Welcome to HealthSync Admin Portal"

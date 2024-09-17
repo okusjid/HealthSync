@@ -1,4 +1,3 @@
-# views.py
 from rest_framework import generics
 from .models import Appointment
 from .serializers import AppointmentSerializer
@@ -11,50 +10,122 @@ from django.db.models.functions import TruncDate
 from datetime import datetime
 
 
-
 # List and create appointments (only admin can create)
 class AppointmentListView(generics.ListCreateAPIView):
+    """
+    View for listing and creating appointments.
+    
+    This view allows the listing of appointments for admin and doctors. Admins can view
+    all appointments and create new ones, while doctors can only view their own appointments.
+    
+    Attributes:
+        serializer_class: Serializer to handle Appointment data.
+        permission_classes: Permission checks, allowing only admins to create appointments.
+    
+    Methods:
+        get_queryset: Returns a filtered queryset based on the user's role (admin/doctor).
+        perform_create: Saves a new appointment, allowed only for admin users.
+    """
     serializer_class = AppointmentSerializer
     permission_classes = [IsAdminUserOrReadOnlyForDoctors]
 
     def get_queryset(self):
+        """
+        Returns the appropriate set of appointments based on the user's role.
+        
+        Admins see all appointments, while doctors see only their appointments.
+        Non-admin, non-doctor users have no access.
+        
+        Returns:
+            QuerySet: A filtered set of appointments.
+        """
         user = self.request.user
         if user.is_staff:
-            # Admin users can see all appointments
             print("Admin user")
             return Appointment.objects.all()
         elif hasattr(user, 'doctor'):
-            # Doctors can see their own appointments
             return Appointment.objects.filter(doctor=user.doctor)
         else:
-            # Other users have no access
             return Appointment.objects.none()
 
     def perform_create(self, serializer):
-        # Only admin users can create appointments
+        """
+        Handles the creation of a new appointment.
+        
+        Only admin users can create appointments, and this method saves the 
+        appointment instance.
+        
+        Args:
+            serializer: The validated serializer data for the appointment.
+        """
         serializer.save()
+
 
 # Retrieve, update, and delete appointments (only admin can update/delete)
 class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    View for retrieving, updating, or deleting an appointment.
+    
+    This view allows admins and doctors to view appointments. However, only admins
+    are allowed to update or delete appointments.
+    
+    Attributes:
+        serializer_class: Serializer to handle Appointment data.
+        permission_classes: Permission checks to restrict update/delete access to admins.
+        lookup_field: The field used to look up the appointment by ID.
+    
+    Methods:
+        get_queryset: Returns a filtered queryset based on the user's role (admin/doctor).
+    """
     serializer_class = AppointmentSerializer
     permission_classes = [IsAdminUserOrAppointmentDoctor]
     lookup_field = 'id'
 
     def get_queryset(self):
+        """
+        Returns the appropriate set of appointments based on the user's role.
+        
+        Admins see all appointments, while doctors see only their appointments.
+        Non-admin, non-doctor users have no access.
+        
+        Returns:
+            QuerySet: A filtered set of appointments.
+        """
         user = self.request.user
         if user.is_staff:
-            # Admin users can access all appointments
             return Appointment.objects.all()
         elif hasattr(user, 'doctor'):
-            # Doctors can access their own appointments
             return Appointment.objects.filter(doctor=user.doctor)
         else:
-            # Other users have no access
             return Appointment.objects.none()
+
+
+# View for counting appointments over time, filtered by date range, status, and doctor
 class AppointmentCountView(APIView):
+    """
+    View to provide the count of appointments over time based on filters.
+    
+    This view allows admin users to retrieve the count of appointments over a specified
+    date range, optionally filtered by status (completed/pending) and doctor's name.
+    
+    Attributes:
+        permission_classes: Permission checks to allow access only to admin users.
+    
+    Methods:
+        get: Handles GET requests to return the count of appointments per day, with optional filters.
+    """
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
+        """
+        Handles GET requests to return the count of appointments per day, filtered by date range, status, and doctor.
+        
+        Args:
+            request: The incoming request with query parameters for filtering (start_date, end_date, status, doctor).
+        
+        Returns:
+            Response: A JSON response containing the count of appointments per day.
+        """
         # Get query parameters for date range, status, and doctor name
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
