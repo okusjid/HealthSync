@@ -4,7 +4,7 @@ from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Appointment
+from ..models import Appointment
 from apps.users.models import User, Doctor, Patient
 
 

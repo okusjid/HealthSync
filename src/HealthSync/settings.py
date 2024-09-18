@@ -175,3 +175,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,  # Show toolbar only when DEBUG is True
 }
+
+import sys
+if 'test' in sys.argv:
+    DEBUG_TOOLBAR = False
+    if 'debug_toolbar' in INSTALLED_APPS:
+        INSTALLED_APPS.remove('debug_toolbar')
+    MIDDLEWARE = [mw for mw in MIDDLEWARE if 'debug_toolbar' not in mw]
