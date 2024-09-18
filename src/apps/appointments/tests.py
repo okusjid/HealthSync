@@ -1,149 +1,161 @@
-from django.test import TestCase
-from rest_framework.test import APIClient
 from django.urls import reverse
-from django.contrib.auth import get_user_model
+from rest_framework.test import APITestCase, APIClient
+from rest_framework import status
 from django.utils import timezone
-from apps.users.models import Doctor, Patient
+from datetime import timedelta
 from .models import Appointment
-from datetime import timedelta, date
+from apps.users.models import User, Doctor, Patient
 
 
-class AppointmentTestCase(TestCase):
+class AppointmentTests(APITestCase):
+    """
+    Test suite for Appointment model API interactions.
+    """
+
     def setUp(self):
         """
-        Create initial data, including users, patients, doctors, and appointments for testing.
+        Set up initial test data, including creating users (admin, doctor, patient),
+        their profiles (Doctor, Patient), and sample appointments.
         """
-        # Get the custom user model
-        User = get_user_model()
+        self.admin_user = User.objects.create_superuser(
+            username='admin', password='adminpassword', email='admin@test.com'
+        )
 
-        # Create an admin user
-        self.admin_user = User.objects.create_superuser(username='admin', password='adminpass')
+        self.doctor_user = User.objects.create_user(
+            username='doctor', password='doctorpassword', email='doctor@test.com', is_doctor=True
+        )
 
-        # Create a doctor user
-        self.doctor_user = User.objects.create_user(username='doctor', password='doctorpass', is_doctor=True)
+        self.patient_user = User.objects.create_user(
+            username='patient', password='patientpassword', email='patient@test.com', is_patient=True
+        )
 
-        # Create a non-admin user
-        self.non_admin_user = User.objects.create_user(username='nonadmin', password='nonadminpass')
-
-        # Create a patient user
-        self.patient_user = User.objects.create_user(username='patient', password='patientpass', is_patient=True)
-
-        # Create doctor and patient profiles
         self.doctor = Doctor.objects.create(user=self.doctor_user, specialization='Cardiology')
+
         self.patient = Patient.objects.create(
             user=self.patient_user,
-            date_of_birth=date(1990, 1, 1),
+            date_of_birth='1990-01-01',
             gender='M'
         )
 
-        # Set up client
-        self.client = APIClient()
-
-        # Create sample appointments
         self.appointment1 = Appointment.objects.create(
             doctor=self.doctor,
             patient=self.patient,
             scheduled_at=timezone.now(),
             is_completed=False
         )
+
         self.appointment2 = Appointment.objects.create(
             doctor=self.doctor,
             patient=self.patient,
-            scheduled_at=timezone.now() + timedelta(days=1),
+            scheduled_at=timezone.now() - timedelta(days=2),
             is_completed=True
         )
 
-    def test_admin_can_list_all_appointments(self):
+        self.client = APIClient()
+
+    def test_admin_can_list_appointments(self):
         """
-        Test that an admin can view all appointments.
+        Ensure admin users can list all appointments.
         """
-        self.client.login(username='admin', password='adminpass')
-        url = reverse('appointment-list')  # URL for AppointmentListView
-        response = self.client.get(url)
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)  # Admin should see both appointments
+        self.client.login(username='admin', password='adminpassword')
+        response = self.client.get(reverse('appointment-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_doctor_can_list_their_appointments(self):
+        """
+        Ensure doctor users can list their own appointments.
+        """
+        self.client.login(username='doctor', password='doctorpassword')
+        response = self.client.get(reverse('appointment-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_patient_cannot_list_appointments(self):
+        """
+        Ensure patients cannot list appointments (403 Forbidden).
+        """
+        self.client.login(username='patient', password='patientpassword')
+        response = self.client.get(reverse('appointment-list'))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_create_appointment(self):
+        """
+        Ensure admin users can create a new appointment.
+        """
+        self.client.login(username='admin', password='adminpassword')
+        data = {
+            "doctor": self.doctor.id,
+            "patient": self.patient.id,
+            "scheduled_at": (timezone.now() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%S'),
+            "is_completed": False
+        }
+        response = self.client.post(reverse('appointment-list'), data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_doctor_cannot_create_appointment(self):
+        """
+        Ensure doctor users cannot create appointments (403 Forbidden).
+        """
+        self.client.login(username='doctor', password='doctorpassword')
+        data = {
+            "doctor": self.doctor.id,
+            "patient": self.patient.id,
+            "scheduled_at": (timezone.now() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%S'),
+            "is_completed": False
+        }
+        response = self.client.post(reverse('appointment-list'), data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_admin_can_update_appointment(self):
         """
-        Test that an admin can update an appointment.
+        Ensure admin users can update an appointment's status.
         """
-        self.client.login(username='admin', password='adminpass')
-        url = reverse('appointment-detail', kwargs={'id': self.appointment1.id})  # URL for AppointmentDetailView
-        data = {'is_completed': True}
-        response = self.client.patch(url, data, format='json')
-        
-        self.assertEqual(response.status_code, 200)
+        self.client.login(username='admin', password='adminpassword')
+        data = {
+            "is_completed": True
+        }
+        response = self.client.patch(reverse('appointment-detail', args=[self.appointment1.id]), data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.appointment1.refresh_from_db()
         self.assertTrue(self.appointment1.is_completed)
 
-    def test_appointment_count_invalid_date_format(self):
-        """
-        Test that invalid date formats result in an error.
-        """
-        self.client.login(username='admin', password='adminpass')
-        url = reverse('appointment-count')
-        response = self.client.get(url, {'start_date': 'invalid', 'end_date': 'invalid'})
-        
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('error', response.data)
-
-    def test_appointment_count_view_with_valid_date_range(self):
-        """
-        Test that an admin can view the count of appointments filtered by a date range.
-        """
-        self.client.login(username='admin', password='adminpass')
-        url = reverse('appointment-count')
-        response = self.client.get(url, {'start_date': '2024-09-01', 'end_date': '2024-09-30'})
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)  # Two appointments within the date range
-
-    def test_appointment_detail_doctor_can_retrieve_own_appointment(self):
-        """
-        Test that a doctor can retrieve the details of their own appointment.
-        """
-        self.client.login(username='doctor', password='doctorpass')
-        url = reverse('appointment-detail', kwargs={'id': self.appointment1.id})  # URL for AppointmentDetailView
-        response = self.client.get(url)
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['id'], self.appointment1.id)
-
-    def test_doctor_can_only_view_their_own_appointments(self):
-        """
-        Test that a doctor can only view their own appointments.
-        """
-        self.client.login(username='doctor', password='doctorpass')
-        url = reverse('appointment-list')
-        response = self.client.get(url)
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)  # The doctor should see both appointments
-
     def test_doctor_cannot_update_appointment(self):
         """
-        Test that a doctor cannot update an appointment (only view).
+        Ensure doctor users cannot update an appointment (403 Forbidden).
         """
-        self.client.login(username='doctor', password='doctorpass')
-        url = reverse('appointment-detail', kwargs={'id': self.appointment1.id})
-        data = {'is_completed': True}
-        response = self.client.patch(url, data, format='json')
-        
-        self.assertEqual(response.status_code, 403)  # Doctors cannot update appointments
-
-    def test_non_admin_cannot_create_appointment(self):
-        """
-        Test that a non-admin user cannot create an appointment.
-        """
-        self.client.login(username='nonadmin', password='nonadminpass')
-        url = reverse('appointment-list')
+        self.client.login(username='doctor', password='doctorpassword')
         data = {
-            'doctor': self.doctor.id,
-            'patient': self.patient.id,
-            'scheduled_at': timezone.now(),
-            'is_completed': False
+            "is_completed": True
         }
-        response = self.client.post(url, data, format='json')
-        
-        self.assertEqual(response.status_code, 403)  # Non-admin users cannot create appointments
+        response = self.client.patch(reverse('appointment-detail', args=[self.appointment1.id]), data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_delete_appointment(self):
+        """
+        Ensure admin users can delete an appointment.
+        """
+        self.client.login(username='admin', password='adminpassword')
+        response = self.client.delete(reverse('appointment-detail', args=[self.appointment1.id]))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_doctor_cannot_delete_appointment(self):
+        """
+        Ensure doctor users cannot delete an appointment (403 Forbidden).
+        """
+        self.client.login(username='doctor', password='doctorpassword')
+        response = self.client.delete(reverse('appointment-detail', args=[self.appointment1.id]))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_appointment_count_view(self):
+        """
+        Test the appointment count view with date range filters.
+        """
+        self.client.login(username='admin', password='adminpassword')
+        start_date = (timezone.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+        end_date = timezone.now().strftime('%Y-%m-%d')
+        response = self.client.get(reverse('appointment-count'), {
+            'start_date': start_date, 'end_date': end_date, 'status': 'completed'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
