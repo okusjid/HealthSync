@@ -1,13 +1,17 @@
-from rest_framework import generics
+import logging
+from rest_framework import generics, permissions
 from .models import Appointment
 from .serializers import AppointmentSerializer
 from .permissions import IsAdminUserOrReadOnlyForDoctors, IsAdminUserOrAppointmentDoctor
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import permissions
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from datetime import datetime
+from django.core.exceptions import ValidationError
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 
 
 # List and create appointments (only admin can create)
@@ -17,14 +21,6 @@ class AppointmentListView(generics.ListCreateAPIView):
     
     This view allows the listing of appointments for admin and doctors. Admins can view
     all appointments and create new ones, while doctors can only view their own appointments.
-    
-    Attributes:
-        serializer_class: Serializer to handle Appointment data.
-        permission_classes: Permission checks, allowing only admins to create appointments.
-    
-    Methods:
-        get_queryset: Returns a filtered queryset based on the user's role (admin/doctor).
-        perform_create: Saves a new appointment, allowed only for admin users.
     """
     serializer_class = AppointmentSerializer
     permission_classes = [IsAdminUserOrAppointmentDoctor]
@@ -40,12 +36,15 @@ class AppointmentListView(generics.ListCreateAPIView):
             QuerySet: A filtered set of appointments.
         """
         user = self.request.user
-        if user.is_staff:
-            print("Admin user")
-            return Appointment.objects.all()
-        elif hasattr(user, 'doctor'):
-            return Appointment.objects.filter(doctor=user.doctor)
-        else:
+        try:
+            if user.is_staff:
+                return Appointment.objects.all()
+            elif hasattr(user, 'doctor'):
+                return Appointment.objects.filter(doctor=user.doctor)
+            else:
+                return Appointment.objects.none()
+        except Exception as e:
+            logging.error(f"Error retrieving appointments: {e}")
             return Appointment.objects.none()
 
     def perform_create(self, serializer):
@@ -54,11 +53,12 @@ class AppointmentListView(generics.ListCreateAPIView):
         
         Only admin users can create appointments, and this method saves the 
         appointment instance.
-        
-        Args:
-            serializer: The validated serializer data for the appointment.
         """
-        serializer.save()
+        try:
+            serializer.save()
+        except Exception as e:
+            logging.error(f"Error creating appointment: {e}")
+            raise ValidationError("An error occurred while creating the appointment.")
 
 
 # Retrieve, update, and delete appointments (only admin can update/delete)
@@ -68,14 +68,6 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     
     This view allows admins and doctors to view appointments. However, only admins
     are allowed to update or delete appointments.
-    
-    Attributes:
-        serializer_class: Serializer to handle Appointment data.
-        permission_classes: Permission checks to restrict update/delete access to admins.
-        lookup_field: The field used to look up the appointment by ID.
-    
-    Methods:
-        get_queryset: Returns a filtered queryset based on the user's role (admin/doctor).
     """
     serializer_class = AppointmentSerializer
     permission_classes = [IsAdminUserOrReadOnlyForDoctors]
@@ -92,36 +84,45 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             QuerySet: A filtered set of appointments.
         """
         user = self.request.user
-        if user.is_staff:
-            return Appointment.objects.all()
-        elif hasattr(user, 'doctor'):
-            return Appointment.objects.filter(doctor=user.doctor)
-        else:
+        try:
+            if user.is_staff:
+                return Appointment.objects.all()
+            elif hasattr(user, 'doctor'):
+                return Appointment.objects.filter(doctor=user.doctor)
+            else:
+                return Appointment.objects.none()
+        except Exception as e:
+            logging.error(f"Error retrieving appointment details: {e}")
             return Appointment.objects.none()
+
+    def perform_update(self, serializer):
+        """
+        Handles the update of an appointment. Only admin users can update appointments.
+        """
+        try:
+            serializer.save()
+        except Exception as e:
+            logging.error(f"Error updating appointment: {e}")
+            raise ValidationError("An error occurred while updating the appointment.")
+
+    def perform_destroy(self, instance):
+        """
+        Handles the deletion of an appointment. Only admin users can delete appointments.
+        """
+        try:
+            instance.delete()
+        except Exception as e:
+            logging.error(f"Error deleting appointment: {e}")
+            raise ValidationError("An error occurred while deleting the appointment.")
 
 
 # View for counting appointments over time, filtered by date range, status, and doctor
-from rest_framework import permissions
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from django.db.models import Count, Q
-from django.db.models.functions import TruncDate
-from datetime import datetime
-
 class AppointmentCountView(APIView):
     """
     View to provide the count of appointments over time based on filters.
     
     This view allows admin users to retrieve the count of appointments over a specified
     date range, optionally filtered by status (completed/pending) and doctor's name.
-    
-    Attributes:
-        permission_classes: Permission checks to allow access only to admin users.
-    
-    Methods:
-        get: Handles GET requests to return the count of appointments per day, with optional filters.
     """
     permission_classes = [permissions.IsAdminUser]
 
@@ -174,35 +175,50 @@ class AppointmentCountView(APIView):
                 status=400
             )
 
-        # Combine filters into a single query
-        filters = Q(scheduled_at__date__gte=start_date_obj.date(), scheduled_at__date__lte=end_date_obj.date())
+        try:
+            # Combine filters into a single query
+            filters = Q(scheduled_at__date__gte=start_date_obj.date(), scheduled_at__date__lte=end_date_obj.date())
 
-        if status:
-            if status.lower() == 'completed':
-                filters &= Q(is_completed=True)
-            elif status.lower() == 'pending':
-                filters &= Q(is_completed=False)
-            else:
-                return Response(
-                    {"error": "Invalid status value. Use 'completed' or 'pending'."},
-                    status=400
-                )
+            if status:
+                if status.lower() == 'completed':
+                    filters &= Q(is_completed=True)
+                elif status.lower() == 'pending':
+                    filters &= Q(is_completed=False)
+                else:
+                    return Response(
+                        {"error": "Invalid status value. Use 'completed' or 'pending'."},
+                        status=400
+                    )
 
-        if doctor_name:
-            filters &= Q(doctor__user__username__icontains=doctor_name)
+            if doctor_name:
+                filters &= Q(doctor__user__username__icontains=doctor_name)
 
+            # Perform a single query with all filters
+            appointment_counts = Appointment.objects.filter(filters) \
+                .annotate(date=TruncDate('scheduled_at')) \
+                .values('date') \
+                .annotate(count=Count('id')) \
+                .order_by('date')
 
-        # Perform a single query with all filters
-        appointment_counts = Appointment.objects.filter(filters) \
-            .annotate(date=TruncDate('scheduled_at')) \
-            .values('date') \
-            .annotate(count=Count('id')) \
-            .order_by('date')
+            # Check if the query returned results
+            if not appointment_counts:
+                return Response({"message": "No appointments found for the given criteria."}, status=404)
 
-        # Prepare the response data
-        data = [
-            {'date': entry['date'], 'appointment_count': entry['count']}
-            for entry in appointment_counts
-        ]
+            # Prepare the response data
+            data = [
+                {'date': entry['date'], 'appointment_count': entry['count']}
+                for entry in appointment_counts
+            ]
 
-        return Response(data)
+            return Response(data, status=200)
+
+        except ValidationError as ve:
+            logging.error(f"Validation error: {ve}")
+            return Response({"error": "Data validation error."}, status=400)
+
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=500
+            )
