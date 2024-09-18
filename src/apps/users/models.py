@@ -54,8 +54,7 @@ class Doctor(TimeStampedModel):
         Returns:
             str: The full name and specialization of the doctor.
         """
-        return f"Dr. {self.user.first_name} {self.user.last_name} - {self.specialization}"
-
+        return f"{self.user.username} - {self.specialization} "
     def details(self):
         """
         Provides a formatted string containing the doctor's name and specialization.
@@ -99,7 +98,7 @@ class Patient(TimeStampedModel):
         Returns:
             str: The full name of the patient.
         """
-        return f"Patient: {self.user.get_full_name()}"
+        return f"Patient: {self.user.username}"
 
     def details(self):
         """
@@ -108,4 +107,4 @@ class Patient(TimeStampedModel):
         Returns:
             str: A string describing the patient, their gender, and their birth date.
         """
-        return f"{self.user.get_full_name()} ({self.get_gender_display()}), born on {self.date_of_birth.strftime('%b %d, %Y')}"
+        return f"{self.user.username} ({self.get_gender_display()}), born on {self.date_of_birth.strftime('%b %d, %Y')}"

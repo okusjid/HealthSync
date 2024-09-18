@@ -27,7 +27,7 @@ class AppointmentListView(generics.ListCreateAPIView):
         perform_create: Saves a new appointment, allowed only for admin users.
     """
     serializer_class = AppointmentSerializer
-    permission_classes = [IsAdminUserOrReadOnlyForDoctors]
+    permission_classes = [IsAdminUserOrAppointmentDoctor]
 
     def get_queryset(self):
         """
@@ -78,7 +78,7 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         get_queryset: Returns a filtered queryset based on the user's role (admin/doctor).
     """
     serializer_class = AppointmentSerializer
-    permission_classes = [IsAdminUserOrAppointmentDoctor]
+    permission_classes = [IsAdminUserOrReadOnlyForDoctors]
     lookup_field = 'id'
 
     def get_queryset(self):
