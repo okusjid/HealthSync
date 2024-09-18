@@ -101,6 +101,15 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # View for counting appointments over time, filtered by date range, status, and doctor
+from rest_framework import permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
+from datetime import datetime
+
 class AppointmentCountView(APIView):
     """
     View to provide the count of appointments over time based on filters.
@@ -116,6 +125,17 @@ class AppointmentCountView(APIView):
     """
     permission_classes = [permissions.IsAdminUser]
 
+    # Define parameters for Swagger documentation
+    start_date_param = openapi.Parameter(
+        'start_date', openapi.IN_QUERY, description="Start date in YYYY-MM-DD format", type=openapi.TYPE_STRING, required=True)
+    end_date_param = openapi.Parameter(
+        'end_date', openapi.IN_QUERY, description="End date in YYYY-MM-DD format", type=openapi.TYPE_STRING, required=True)
+    status_param = openapi.Parameter(
+        'status', openapi.IN_QUERY, description="Status of appointments (completed/pending)", type=openapi.TYPE_STRING, required=False)
+    doctor_name_param = openapi.Parameter(
+        'doctor', openapi.IN_QUERY, description="Doctor's name to filter appointments", type=openapi.TYPE_STRING, required=False)
+
+    @swagger_auto_schema(manual_parameters=[start_date_param, end_date_param, status_param, doctor_name_param])
     def get(self, request):
         """
         Handles GET requests to return the count of appointments per day, filtered by date range, status, and doctor.
@@ -129,8 +149,8 @@ class AppointmentCountView(APIView):
         # Get query parameters for date range, status, and doctor name
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
-        status = request.query_params.get('status')  # expecting 'completed' or 'pending'
-        doctor_name = request.query_params.get('doctor')  # filter by doctor's name
+        status = request.query_params.get('status')
+        doctor_name = request.query_params.get('doctor_username')
 
         # Validate the date inputs
         if not start_date or not end_date:
@@ -154,35 +174,32 @@ class AppointmentCountView(APIView):
                 status=400
             )
 
-        # Initial filter based on date range
-        appointments = Appointment.objects.filter(
-            scheduled_at__date__gte=start_date_obj.date(),
-            scheduled_at__date__lte=end_date_obj.date()
-        )
+        # Combine filters into a single query
+        filters = Q(scheduled_at__date__gte=start_date_obj.date(), scheduled_at__date__lte=end_date_obj.date())
 
-        # Filter by status if provided
         if status:
             if status.lower() == 'completed':
-                appointments = appointments.filter(is_completed=True)
+                filters &= Q(is_completed=True)
             elif status.lower() == 'pending':
-                appointments = appointments.filter(is_completed=False)
+                filters &= Q(is_completed=False)
             else:
                 return Response(
                     {"error": "Invalid status value. Use 'completed' or 'pending'."},
                     status=400
                 )
 
-        # Filter by doctor's name if provided
         if doctor_name:
-            appointments = appointments.filter(
+            filters &= (
                 Q(doctor__user__first_name__icontains=doctor_name) |
                 Q(doctor__user__last_name__icontains=doctor_name)
             )
 
-        # Aggregate the counts per day
-        appointment_counts = appointments.annotate(
-            date=TruncDate('scheduled_at')
-        ).values('date').annotate(count=Count('id')).order_by('date')
+        # Perform a single query with all filters
+        appointment_counts = Appointment.objects.filter(filters) \
+            .annotate(date=TruncDate('scheduled_at')) \
+            .values('date') \
+            .annotate(count=Count('id')) \
+            .order_by('date')
 
         # Prepare the response data
         data = [
