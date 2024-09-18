@@ -10,8 +10,8 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-# User Profile View (for authenticated users)
-class ProfileView(generics.RetrieveUpdateDestroyAPIView):
+# User Profile View (for authenticated user)
+class ProfileView(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
