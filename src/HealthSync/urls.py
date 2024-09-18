@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
+from django.conf import settings
 
 """
 URL configuration for the HealthSync project.
@@ -45,3 +46,9 @@ admin.site.index_title = "Welcome to HealthSync Admin Portal"
 
 # Unregister the Group model from admin since it may not be used
 admin.site.unregister(Group)
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns

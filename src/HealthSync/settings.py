@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'drf_yasg', # Swagger UI
     'apps.users', # Custom users app
     'apps.appointments', # Appointments app
-    'corsheaders' # CORS headers
+    'corsheaders', # CORS headers
+    'debug_toolbar', # Django Debug Toolbar
 ]
 
 MIDDLEWARE = [
@@ -53,7 +54,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware' # CORS middleware
+    'corsheaders.middleware.CorsMiddleware', # CORS middleware
+    'debug_toolbar.middleware.DebugToolbarMiddleware', # Debug Toolbar middleware
 ]
 
 ROOT_URLCONF = 'HealthSync.urls'
@@ -169,3 +171,7 @@ SWAGGER_SETTINGS = {
 
 AUTH_USER_MODEL = 'users.User'
 CORS_ALLOW_ALL_ORIGINS = True
+
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,  # Show toolbar only when DEBUG is True
+}
