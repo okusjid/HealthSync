@@ -150,7 +150,7 @@ class AppointmentCountView(APIView):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         status = request.query_params.get('status')
-        doctor_name = request.query_params.get('doctor_username')
+        doctor_name = request.query_params.get('doctor')
 
         # Validate the date inputs
         if not start_date or not end_date:
@@ -189,10 +189,8 @@ class AppointmentCountView(APIView):
                 )
 
         if doctor_name:
-            filters &= (
-                Q(doctor__user__first_name__icontains=doctor_name) |
-                Q(doctor__user__last_name__icontains=doctor_name)
-            )
+            filters &= Q(doctor__user__username__icontains=doctor_name)
+
 
         # Perform a single query with all filters
         appointment_counts = Appointment.objects.filter(filters) \
