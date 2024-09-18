@@ -11,7 +11,8 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
+from rest_framework import pagination
+from rest_framework.pagination import PageNumberPagination
 
 
 # List and create appointments (only admin can create)
@@ -116,44 +117,35 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise ValidationError("An error occurred while deleting the appointment.")
 
 
-# View for counting appointments over time, filtered by date range, status, and doctor
 class AppointmentCountView(APIView):
     """
     View to provide the count of appointments over time based on filters.
-    
     This view allows admin users to retrieve the count of appointments over a specified
     date range, optionally filtered by status (completed/pending) and doctor's name.
     """
     permission_classes = [permissions.IsAdminUser]
 
-    # Define parameters for Swagger documentation
     start_date_param = openapi.Parameter(
-        'start_date', openapi.IN_QUERY, description="Start date in YYYY-MM-DD format", type=openapi.TYPE_STRING, required=True)
+        'start_date', openapi.IN_QUERY, description="Start date for the date range (YYYY-MM-DD)", type=openapi.TYPE_STRING
+    )
     end_date_param = openapi.Parameter(
-        'end_date', openapi.IN_QUERY, description="End date in YYYY-MM-DD format", type=openapi.TYPE_STRING, required=True)
+        'end_date', openapi.IN_QUERY, description="End date for the date range (YYYY-MM-DD)", type=openapi.TYPE_STRING
+    )
     status_param = openapi.Parameter(
-        'status', openapi.IN_QUERY, description="Status of appointments (completed/pending)", type=openapi.TYPE_STRING, required=False)
+        'status', openapi.IN_QUERY, description="Filter by status (completed/pending)", type=openapi.TYPE_STRING
+    )
     doctor_name_param = openapi.Parameter(
-        'doctor', openapi.IN_QUERY, description="Doctor's name to filter appointments", type=openapi.TYPE_STRING, required=False)
+        'doctor', openapi.IN_QUERY, description="Filter by doctor's name", type=openapi.TYPE_STRING
+    )
+
 
     @swagger_auto_schema(manual_parameters=[start_date_param, end_date_param, status_param, doctor_name_param])
     def get(self, request):
-        """
-        Handles GET requests to return the count of appointments per day, filtered by date range, status, and doctor.
-        
-        Args:
-            request: The incoming request with query parameters for filtering (start_date, end_date, status, doctor).
-        
-        Returns:
-            Response: A JSON response containing the count of appointments per day.
-        """
-        # Get query parameters for date range, status, and doctor name
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         status = request.query_params.get('status')
         doctor_name = request.query_params.get('doctor')
 
-        # Validate the date inputs
         if not start_date or not end_date:
             return Response(
                 {"error": "Please provide 'start_date' and 'end_date' query parameters in 'YYYY-MM-DD' format."},
@@ -176,7 +168,6 @@ class AppointmentCountView(APIView):
             )
 
         try:
-            # Combine filters into a single query
             filters = Q(scheduled_at__date__gte=start_date_obj.date(), scheduled_at__date__lte=end_date_obj.date())
 
             if status:
@@ -193,32 +184,27 @@ class AppointmentCountView(APIView):
             if doctor_name:
                 filters &= Q(doctor__user__username__icontains=doctor_name)
 
-            # Perform a single query with all filters
             appointment_counts = Appointment.objects.filter(filters) \
                 .annotate(date=TruncDate('scheduled_at')) \
                 .values('date') \
                 .annotate(count=Count('id')) \
                 .order_by('date')
 
-            # Check if the query returned results
             if not appointment_counts:
                 return Response({"message": "No appointments found for the given criteria."}, status=404)
 
-            # Prepare the response data
             data = [
                 {'date': entry['date'], 'appointment_count': entry['count']}
                 for entry in appointment_counts
             ]
 
-            return Response(data, status=200)
+            
+            # paginator = PageNumberPagination()
+            # paginator.page_size = 5  # Set page size to 5 appointments per page
+            # paginated_data = paginator.paginate_queryset(data, request)
 
-        except ValidationError as ve:
-            logging.error(f"Validation error: {ve}")
-            return Response({"error": "Data validation error."}, status=400)
+            # return paginator.get_paginated_response(paginated_data)
 
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
-            return Response(
-                {"error": "An unexpected error occurred. Please try again later."},
-                status=500
-            )
+            return Response({"error": "An unexpected error occurred. Please try again later."}, status=500)

@@ -182,3 +182,9 @@ if 'test' in sys.argv:
     if 'debug_toolbar' in INSTALLED_APPS:
         INSTALLED_APPS.remove('debug_toolbar')
     MIDDLEWARE = [mw for mw in MIDDLEWARE if 'debug_toolbar' not in mw]
+
+# Pagination
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 5
+}
